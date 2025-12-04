@@ -1,0 +1,10 @@
+train_hparams:
+    lr: 1e-4
+    train_batch_size: 12
+    val_batch_size: 12
+    num_workers: 6
+    max_epoch: 20
+    accelerator: "cuda"
+
+logging:
+  logging_step: 100
