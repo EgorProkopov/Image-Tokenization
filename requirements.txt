@@ -1,4 +1,7 @@
+omegaconf
 matplotlib
 numpy
 torch
 torchvision
+torchmetrics
+lightning

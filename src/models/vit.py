@@ -163,3 +163,20 @@ class VisionTransformer(nn.Module):
         x = x[:, 0]
         logits = self.classifier(x)
         return logits
+
+
+class ViTLightingModule(CustomClassificationLightningModule):
+    def __init__(self, model_hparams, criterion, lr, log_step=1000):
+        model = VisionTransformer(
+            image_size=model_hparams["image_size"],
+            patch_size=model_hparams["patch_size"],
+            in_channels=model_hparams["in_channels"],
+            embedding_dim=model_hparams["embedding_dim"],
+            qkv_dim=model_hparams["qkv_dim"],
+            mlp_hidden_size=model_hparams["mlp_hidden_size"],
+            n_layers=model_hparams["n_layers"],
+            n_heads=model_hparams["n_heads"],
+            n_classes=model_hparams["n_classes"]
+        )
+        super().__init__(model, criterion, lr, n_classes=model_hparams["n_classes"], log_step=log_step)
+        self.save_hyperparameters()
