@@ -3,8 +3,10 @@ train_hparams:
     train_batch_size: 12
     val_batch_size: 12
     num_workers: 6
-    max_epoch: 20
-    accelerator: "cuda"
+    max_epoch: 2
+    accelerator: "mps"
 
 logging:
-  logging_step: 100
+  logging_train_step: 100
+  logging_eval_step: 2000
+  checkpoint_step: 2000
