@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from src.lightning_modules.classification_lightning_modules import CustomClassificationLightningModule
 from src.tokenizers.vit.vit_tokenizer import ViTTokenization
 
 
