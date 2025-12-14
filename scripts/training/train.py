@@ -1,81 +1,96 @@
-from typing import Any, Dict, Optional, Sequence, Tuple, Union
+import os
 
-import lightning.pytorch as pl
-from clearml import Task
-from lightning.pytorch.callbacks import ModelCheckpoint
-from lightning.pytorch.loggers import ClearMLLogger
+from typing import Optional
+from omegaconf import DictConfig 
+
+import torch
 from torch.utils.data import DataLoader
 
-from scripts.evaluation.eval import evaluate_classification
-from src.lightning_modules.classification_lightning_modules import (
-    CustomClassificationLightningModule,
-)
+import lightning.pytorch as pl
+from lightning.pytorch import Trainer
+from lightning.pytorch.callbacks import LearningRateMonitor, ModelCheckpoint
+from lightning.pytorch.loggers import TensorBoardLogger
+from clearml import Task
+from clearml import Logger as ClearMLLogger
+
+from src.lightning_modules.classification_lightning_modules import CustomClassificationLightningModule
+from src.utils import set_seed
 
 
-def _init_clearml_logger(
-    project_name: str, task_name: str, hyperparams: Optional[Dict[str, Any]] = None
-) -> Tuple[Task, ClearMLLogger]:
-    """
-    Inits ClearML Task object and Logger object with hyperparameters attached.
-    """
-    task = Task.init(project_name=project_name, task_name=task_name)
-    logger = ClearMLLogger(task=task)
-    if hyperparams:
-        logger.log_hyperparams(hyperparams)
-        task.connect(hyperparams)
-    return task, logger
+def _init_clearml_task(
+        project_name: str,
+        task_name: str,
+) -> Optional[Task]:
+    task = Task.init(
+        project_name=project_name,
+        task_name=task_name,
+    ) 
+    # TODO: логирование конфигов?
+    return task
 
 
 def train_classification(
     model: CustomClassificationLightningModule,
     train_dataloader: DataLoader,
-    val_dataloader: Optional[DataLoader],
-    *,
-    max_epochs: int,
-    logging_train_step: int,
-    logging_eval_step: int,
-    checkpoint_step: int,
-    clearml_project: str,
-    clearml_task_name: str,
-    hyperparams: Optional[Dict[str, Any]] = None,
-    accelerator: str = "auto",
-    devices: Optional[Union[int, str, Sequence[int]]] = None,
-    default_root_dir: Optional[str] = None,
-    enable_progress_bar: bool = True,
-) -> Tuple[pl.Trainer, Optional[Dict[str, Any]]]:
-    """
-    Trains a classification model
-    """
-    _, logger = _init_clearml_logger(
-        project_name=clearml_project, task_name=clearml_task_name, hyperparams=hyperparams
+    val_dataloader: DataLoader,
+
+    training_config: DictConfig,
+):
+    cleaml_project_name = training_config['clearml']['project_name']
+    clearml_task_name = training_config['clearml']['task_name']
+
+    seed = training_config["seed"]
+
+    accelerator = training_config['training']['accelerator']
+    devices = training_config['training']['devices']
+    strategy = training_config['training']['strategy']
+    max_epochs = training_config['training']['max_epochs']
+
+
+    log_every_n_steps = training_config['logging']['log_every_n_steps']
+    val_check_interval = training_config['logging']['val_check_interval']
+    checkpoints_dir = training_config['logging']['checkpoints_dir']
+    log_dir = training_config['logging']['log_dir']
+
+    set_seed(seed=seed)
+
+    clearml_task = _init_clearml_task(
+        project_name=cleaml_project_name,
+        task_name=clearml_task_name
     )
 
-    checkpoint_callback = ModelCheckpoint(
-        every_n_train_steps=checkpoint_step,
-        save_top_k=-1,
-        save_last=True,
-        filename="step-{step}",
-        save_weights_only=False,
+    tb_logger = TensorBoardLogger(
+        save_dir=log_dir,          
+        name=clearml_task_name,    
+        version=None,              
     )
 
-    trainer = pl.Trainer(
-        max_epochs=max_epochs,
+    checkpoint_cb = ModelCheckpoint(
+        dirpath=os.path.join(checkpoints_dir, cleaml_project_name, clearml_task_name),
+        filename="{epoch}-{step}",
+    )
+
+    callbacks = [
+        checkpoint_cb,
+        LearningRateMonitor(logging_interval="step"),
+    ]
+
+    torch.set_float32_matmul_precision('medium')
+
+    trainer = Trainer(
         accelerator=accelerator,
         devices=devices,
-        logger=logger,
-        callbacks=[checkpoint_callback],
-        log_every_n_steps=logging_train_step,
-        val_check_interval=logging_eval_step,
+        strategy=strategy,
+        max_epochs=max_epochs,
+        logger=tb_logger,  # TODO: добавить логгер  
+        callbacks=callbacks,
+        log_every_n_steps=log_every_n_steps,
+        val_check_interval=val_check_interval,
+        default_root_dir=log_dir,
         enable_checkpointing=True,
-        default_root_dir=default_root_dir,
-        enable_progress_bar=enable_progress_bar,
     )
 
-    trainer.fit(
-        model=model,
-        train_dataloaders=train_dataloader,
-        val_dataloaders=val_dataloader,
-    )
+    trainer.fit(model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
 
-    evaluation = evaluate_classification(trainer, model, val_dataloader)
-    return trainer, evaluation
+    return trainer
+

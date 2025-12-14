@@ -6,3 +6,6 @@ torchvision
 torchmetrics
 lightning
 clearml
+datasets
+python-dotenv
+tensorboard

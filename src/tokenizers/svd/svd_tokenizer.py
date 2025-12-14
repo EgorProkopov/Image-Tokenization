@@ -250,3 +250,5 @@ class SVDSquareTokenizer(nn.Module):
         approx_image = torch.bmm(US, Vt)
 
         return approx_image
+
+

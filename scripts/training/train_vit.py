@@ -1,60 +1,74 @@
-import argparse
-from pathlib import Path
-from typing import Optional, Sequence, Union
+import os
+import dotenv
+
+from typing import Tuple
+from omegaconf import DictConfig, OmegaConf
 
 import torch
-from omegaconf import OmegaConf
 from torch.utils.data import DataLoader
-from torchvision import datasets, transforms
+from datasets import load_dataset
+from torchvision import transforms
 
 from scripts.training.train import train_classification
 from src.models.vit import ViTLightingModule
-from src.utils import set_seed
 
 
-def _parse_devices(devices: Optional[str]) -> Optional[Union[int, str, Sequence[int]]]:
-    if devices is None:
-        return None
-    if devices.lower() == "auto":
-        return "auto"
-    if devices.isdigit():
-        return int(devices)
-    parsed = [int(item.strip()) for item in devices.split(",") if item.strip()]
-    return parsed or None
+def prepare_dataloaders(
+    image_size: int = 224,
+    train_batch_size: int = 64,
+    val_batch_size: int = 64,
+    num_workers: int = 4,
+    dataset_name: str = "benjamin-paine/imagenet-1k",
+) -> Tuple[DataLoader, DataLoader]:
+    """
+    Build ImageNet-1k train/val dataloaders from the HuggingFace dataset.
+    """
 
+    dataset = load_dataset(dataset_name)
 
-def build_dataloaders(
-    train_dir: Path,
-    val_dir: Path,
-    image_size: int,
-    train_batch_size: int,
-    val_batch_size: int,
-    num_workers: int,
-) -> tuple[DataLoader, DataLoader, int]:
-    train_transform = transforms.Compose(
-        [
-            transforms.Resize((image_size, image_size)),
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-            transforms.Normalize(
-                mean=(0.485, 0.456, 0.406),
-                std=(0.229, 0.224, 0.225),
-            ),
-        ]
+    train_split_name = "train" if "train" in dataset else next(iter(dataset.keys()))
+    val_split_name = "validation" if "validation" in dataset else "val"
+    if val_split_name not in dataset:
+        raise ValueError(f"Validation split not found in dataset '{dataset_name}'.")
+
+    train_hf_ds = dataset[train_split_name]
+    val_hf_ds = dataset[val_split_name]
+
+    normalize = transforms.Normalize(
+        mean=[0.485, 0.456, 0.406],
+        std=[0.229, 0.224, 0.225]
+    
     )
-    eval_transform = transforms.Compose(
-        [
-            transforms.Resize((image_size, image_size)),
-            transforms.ToTensor(),
-            transforms.Normalize(
-                mean=(0.485, 0.456, 0.406),
-                std=(0.229, 0.224, 0.225),
-            ),
-        ]
-    )
+    train_transform = transforms.Compose([
+        transforms.Resize(image_size + 32),
+        transforms.RandomResizedCrop(image_size),
+        transforms.RandomHorizontalFlip(),
+        transforms.ToTensor(),
+        normalize,
+    ])
+    val_transform = transforms.Compose([
+        transforms.Resize(image_size + 32),
+        transforms.CenterCrop(image_size),
+        transforms.ToTensor(),
+        normalize,
+    ])
 
-    train_dataset = datasets.ImageFolder(train_dir.as_posix(), transform=train_transform)
-    val_dataset = datasets.ImageFolder(val_dir.as_posix(), transform=eval_transform)
+    class HFDataset(torch.utils.data.Dataset):
+        def __init__(self, hf_dataset, transform):
+            self.dataset = hf_dataset
+            self.transform = transform
+
+        def __len__(self):
+            return len(self.dataset)
+
+        def __getitem__(self, idx):
+            sample = self.dataset[idx]
+            image = sample["image"].convert("RGB")
+            label = torch.tensor(sample["label"], dtype=torch.long)
+            return self.transform(image), label
+
+    train_dataset = HFDataset(train_hf_ds, train_transform)
+    val_dataset = HFDataset(val_hf_ds, val_transform)
 
     train_loader = DataLoader(
         train_dataset,
@@ -62,7 +76,6 @@ def build_dataloaders(
         shuffle=True,
         num_workers=num_workers,
         pin_memory=torch.cuda.is_available(),
-        persistent_workers=num_workers > 0,
     )
     val_loader = DataLoader(
         val_dataset,
@@ -70,146 +83,71 @@ def build_dataloaders(
         shuffle=False,
         num_workers=num_workers,
         pin_memory=torch.cuda.is_available(),
-        persistent_workers=num_workers > 0,
     )
 
-    return train_loader, val_loader, len(train_dataset.classes)
+    return train_loader, val_loader
 
 
-def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Train ViT classification model.")
-    parser.add_argument(
-        "--config",
-        type=str,
-        default="configs/training/vit.yaml",
-        help="Path to training config.",
-    )
-    parser.add_argument(
-        "--model-config",
-        type=str,
-        default="configs/models/vit.yaml",
-        help="Path to model config.",
-    )
-    parser.add_argument(
-        "--train-dir",
-        type=str,
-        required=True,
-        help="Path to training images in ImageFolder format.",
-    )
-    parser.add_argument(
-        "--val-dir",
-        type=str,
-        required=True,
-        help="Path to validation images in ImageFolder format.",
-    )
-    parser.add_argument(
-        "--project-name",
-        type=str,
-        default="image-tokenization",
-        help="ClearML project name.",
-    )
-    parser.add_argument(
-        "--task-name",
-        type=str,
-        default="vit-classification",
-        help="ClearML task name.",
-    )
-    parser.add_argument(
-        "--num-classes",
-        type=int,
-        default=None,
-        help="Override number of classes if it cannot be inferred from the dataset.",
-    )
-    parser.add_argument(
-        "--accelerator",
-        type=str,
-        default=None,
-        help="Lightning accelerator override (cpu, gpu, mps, auto).",
-    )
-    parser.add_argument(
-        "--devices",
-        type=str,
-        default=None,
-        help="Device specification (e.g. '0', '0,1', or 'auto').",
-    )
-    parser.add_argument(
-        "--seed",
-        type=int,
-        default=239,
-        help="Random seed for reproducibility.",
-    )
-    parser.add_argument(
-        "--default-root-dir",
-        type=str,
-        default="checkpoints/vit",
-        help="Where to store checkpoints and logs.",
-    )
-    return parser.parse_args()
+def train_vit(
+    model_config: DictConfig,
+    tokenizer_config: DictConfig,
+    training_config: DictConfig
+):
+    #TODO: добавить ассерты между конфигами на совпадение одинаковых ключей
 
+    model_hparams = {
+        'embedding_dim': model_config['embedding_dim'],
+        'qkv_dim': model_config['qkv_dim'],
+        'mlp_hidden_size': model_config['mlp_hidden_size'],
+        'n_layers': model_config['n_layers'],
+        'n_heads': model_config['n_heads'],
+        'n_classes': model_config['n_classes']
+    }
 
-def main():
-    args = parse_args()
-    set_seed(args.seed)
+    tokenizer_hparams = {
+        'image_size': tokenizer_config['image_size'],
+        'patch_size': tokenizer_config['patch_size'],
+        'in_channels': tokenizer_config['in_channels']
+    }
 
-    train_cfg = OmegaConf.load(args.config)
-    model_cfg = OmegaConf.load(args.model_config)
+    cross_entropy_criterion = torch.nn.CrossEntropyLoss()
 
-    train_hparams = OmegaConf.to_container(train_cfg.get("train_hparams", {}), resolve=True)
-    logging_cfg = OmegaConf.to_container(train_cfg.get("logging", {}), resolve=True)
-    model_hparams = OmegaConf.to_container(model_cfg.get("model", {}), resolve=True)
+    lr = training_config['training']['lr']
+    # TODO: ADD LR schedule
 
-    train_dir = Path(args.train_dir)
-    val_dir = Path(args.val_dir)
-    if not train_dir.exists() or not val_dir.exists():
-        raise FileNotFoundError("Train or validation directory does not exist.")
-
-    devices = _parse_devices(args.devices) or train_hparams.get("devices")
-    accelerator = args.accelerator or train_hparams.get("accelerator", "auto")
-    num_workers = int(train_hparams.get("num_workers", 0))
-
-    train_loader, val_loader, inferred_classes = build_dataloaders(
-        train_dir=train_dir,
-        val_dir=val_dir,
-        image_size=int(model_hparams["image_size"]),
-        train_batch_size=int(train_hparams["train_batch_size"]),
-        val_batch_size=int(train_hparams["val_batch_size"]),
-        num_workers=num_workers,
-    )
-
-    model_hparams["n_classes"] = args.num_classes or model_hparams.get("n_classes") or inferred_classes
-
-    criterion = torch.nn.CrossEntropyLoss()
     model = ViTLightingModule(
         model_hparams=model_hparams,
-        criterion=criterion,
-        lr=float(train_hparams["lr"]),
-        log_step=int(logging_cfg["logging_train_step"]),
+        tokenizer_hparams=tokenizer_hparams,
+        criterion=cross_entropy_criterion,
+        lr=lr,
+        log_step=training_config['logging']['log_every_n_steps']
     )
 
-    hyperparams = {
-        "model": model_hparams,
-        "train_hparams": train_hparams,
-        "logging": logging_cfg,
-        "data": {"train_dir": str(train_dir), "val_dir": str(val_dir)},
-        "seed": args.seed,
-    }
+    train_dataloader, val_dataloader = prepare_dataloaders(
+        image_size=tokenizer_config['image_size'],
+        train_batch_size=training_config['training']['train_batch_size'],
+        val_batch_size=training_config['training']['val_batch_size'],
+        num_workers=training_config['training']['num_workers']
+    )
 
     train_classification(
         model=model,
-        train_dataloader=train_loader,
-        val_dataloader=val_loader,
-        max_epochs=int(train_hparams["max_epoch"]),
-        logging_train_step=int(logging_cfg["logging_train_step"]),
-        logging_eval_step=int(logging_cfg["logging_eval_step"]),
-        checkpoint_step=int(logging_cfg["checkpoint_step"]),
-        clearml_project=args.project_name,
-        clearml_task_name=args.task_name,
-        hyperparams=hyperparams,
-        accelerator=accelerator,
-        devices=devices,
-        default_root_dir=args.default_root_dir,
+        train_dataloader=train_dataloader,
+        val_dataloader=val_dataloader,
+        training_config=training_config
     )
 
 
 if __name__ == "__main__":
-    main()
+    dotenv.load_dotenv()
+
+    CONFIGS_DIR = os.getenv("CONFIGS_DIR")
+    model_config = OmegaConf.load(os.path.join(CONFIGS_DIR, "models", "vit_base.yaml"))
+    tokenizer_config = OmegaConf.load(os.path.join(CONFIGS_DIR, "tokenizers", "vit.yaml"))
+    training_config = OmegaConf.load(os.path.join(CONFIGS_DIR, "training", "vit.yaml"))
+
+    train_vit(
+        model_config=model_config,
+        tokenizer_config=tokenizer_config,
+        training_config=training_config
+    )
