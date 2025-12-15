@@ -78,10 +78,10 @@ class SVDNetworkTokenizer(nn.Module):
         Calculates raw u and v features (in tokens shapes)
         """
 
-        # TODO: add residual connections
         raw_u = self.u_feature_extractor(x)
         raw_v = self.v_feature_extractor(x)
 
+        # TODO: add residual connections
         projected_u = self.projection_u(raw_u)
         projected_v = self.projection_v(raw_v)
 
@@ -201,4 +201,3 @@ class SVDTEFTokenizer(SVDNetworkTokenizer):
         padded_tokens = pad_sequence(filtered_list, batch_first=True)  # [B, M_max, E]
 
         return {"tokens": padded_tokens, "scores": scores}
-

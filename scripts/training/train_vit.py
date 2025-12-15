@@ -18,10 +18,14 @@ def prepare_dataloaders(
     train_batch_size: int = 64,
     val_batch_size: int = 64,
     num_workers: int = 4,
-    dataset_name: str = "benjamin-paine/imagenet-1k",
+    dataset_name: str = "clane9/imagenet-100",
 ) -> Tuple[DataLoader, DataLoader]:
     """
-    Build ImageNet-1k train/val dataloaders from the HuggingFace dataset.
+    Build train/val dataloaders from the HuggingFace dataset.
+
+    ImageNet-1k: benjamin-paine/imagenet-1k
+    ImageNet-100: clane9/imagenet-100
+    EuroSAT RGB-10: blanchon/EuroSAT_RGB
     """
 
     dataset = load_dataset(dataset_name)
@@ -113,14 +117,17 @@ def train_vit(
     cross_entropy_criterion = torch.nn.CrossEntropyLoss()
 
     lr = training_config['training']['lr']
-    # TODO: ADD LR schedule
+    max_epochs = training_config['training']['max_epochs']
+    warmup_steps = training_config['training'].get('warmup_steps', 0)
 
     model = ViTLightingModule(
         model_hparams=model_hparams,
         tokenizer_hparams=tokenizer_hparams,
         criterion=cross_entropy_criterion,
         lr=lr,
-        log_step=training_config['logging']['log_every_n_steps']
+        log_step=training_config['logging']['log_every_n_steps'],
+        max_epochs=max_epochs,
+        warmup_steps=warmup_steps,
     )
 
     train_dataloader, val_dataloader = prepare_dataloaders(

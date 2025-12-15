@@ -153,8 +153,10 @@ class VisionTransformer(nn.Module):
             n_heads=n_heads
         )
         self.classifier = nn.Sequential(
+            nn.LayerNorm(embedding_dim),
             nn.Linear(embedding_dim, 128),
             nn.ReLU(),
+            nn.Dropout(0.1),
             nn.Linear(128, n_classes)
         )
 
@@ -167,7 +169,16 @@ class VisionTransformer(nn.Module):
 
 
 class ViTLightingModule(CustomClassificationLightningModule):
-    def __init__(self, model_hparams, tokenizer_hparams, criterion, lr, log_step=1000):
+    def __init__(
+        self,
+        model_hparams,
+        tokenizer_hparams,
+        criterion,
+        lr,
+        log_step=1000,
+        max_epochs=1,
+        warmup_steps=0,
+    ):
         model = VisionTransformer(
             image_size=tokenizer_hparams["image_size"],
             patch_size=tokenizer_hparams["patch_size"],
@@ -179,5 +190,13 @@ class ViTLightingModule(CustomClassificationLightningModule):
             n_heads=model_hparams["n_heads"],
             n_classes=model_hparams["n_classes"]
         )
-        super().__init__(model, criterion, lr, n_classes=model_hparams["n_classes"], log_step=log_step)
+        super().__init__(
+            model,
+            criterion,
+            lr,
+            n_classes=model_hparams["n_classes"],
+            log_step=log_step,
+            max_epochs=max_epochs,
+            warmup_steps=warmup_steps,
+        )
         self.save_hyperparameters()

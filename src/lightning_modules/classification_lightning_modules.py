@@ -4,7 +4,7 @@ from torchmetrics import Accuracy, Precision, Recall, F1Score
 
 
 class CustomClassificationLightningModule(pl.LightningModule):
-    def __init__(self, model, criterion, lr, n_classes, log_step=1000):
+    def __init__(self, model, criterion, lr, n_classes, log_step=1000, max_epochs=1, warmup_steps=0):
         """
         Base class for custom classification lightning models
 
@@ -13,12 +13,16 @@ class CustomClassificationLightningModule(pl.LightningModule):
          - criterion: loss function
          - lr: learning rate
          - n_classes: num_classes
+         - max_epochs: total epochs for exponential decay schedule
+         - warmup_steps: number of warmup steps before decay
         """
         super().__init__()
         self.model = model
         self.criterion = criterion
         self.lr = lr
         self.log_step = log_step
+        self.max_epochs = max_epochs
+        self.warmup_steps = warmup_steps
 
         self.train_accuracy = Accuracy(num_classes=n_classes, task="multiclass")
         self.train_precision = Precision(num_classes=n_classes, average='macro', task="multiclass")
@@ -36,6 +40,8 @@ class CustomClassificationLightningModule(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         # images = batch["image"]
         # labels = batch["label_encoded"]
+
+        self.model = self.model.train()
 
         images, labels = batch
 
@@ -73,6 +79,7 @@ class CustomClassificationLightningModule(pl.LightningModule):
     def validation_step(self, batch, batch_idx):
         # images = batch["image"]
         # labels = batch["label_encoded"]
+        self.model = self.model.eval()
 
         images, labels = batch
 
@@ -105,5 +112,61 @@ class CustomClassificationLightningModule(pl.LightningModule):
         self.val_f1.reset()
 
     def configure_optimizers(self):
+        """
+        AdamW with linear warmup and exponential decay
+        """
         optimizer = torch.optim.AdamW(self.parameters(), lr=self.lr)
-        return optimizer
+        if self.max_epochs <= 0:
+            return optimizer
+
+        schedulers = []
+        if self.warmup_steps > 0:
+            warmup = torch.optim.lr_scheduler.LinearLR(
+                optimizer,
+                start_factor=0.1,
+                total_iters=self.warmup_steps
+            )
+            schedulers.append({
+                "scheduler": warmup,
+                "interval": "step",
+                "frequency": 1,
+                "name": "linear_warmup_lr",
+            })
+
+        exp_decay = torch.optim.lr_scheduler.ExponentialLR(
+            optimizer,
+            gamma=0.80
+        )
+        schedulers.append({
+            "scheduler": exp_decay,
+            "interval": "epoch",
+            "frequency": 1,
+            "name": "exponential_lr",
+        })
+
+        return [optimizer], schedulers
+
+    def on_before_optimizer_step(self, optimizer):
+        """
+        Logs global gradient norm.
+        """
+        if self.global_step == 0 or self.global_step % self.log_step != 0:
+            return
+
+        grads = [
+            p.grad.detach()
+            for p in self.model.parameters()
+            if p.grad is not None
+        ]
+        if not grads:
+            return
+
+        stacked_norms = torch.stack([g.norm(2) for g in grads])
+        total_norm = torch.norm(stacked_norms, 2)
+        self.log(
+            "grad_norm",
+            total_norm,
+            prog_bar=False,
+            on_step=True,
+            on_epoch=False,
+        )
