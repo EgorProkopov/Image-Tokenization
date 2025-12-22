@@ -5,6 +5,28 @@ from torch.nn.utils.rnn import pad_sequence  # TODO: заменить на со�
 from src.tokenizers.positional_encoding import PositionalEncoding
 
 
+class ResidualPixelUnshuffleBlock(nn.Module):
+    def __init__(self, channels: int, scale: int):
+        super().__init__()
+        self.conv = nn.Conv2d(
+            in_channels=channels,
+            out_channels=channels,
+            kernel_size=3,
+            padding=1,
+            stride=1,
+        )
+        self.bn = nn.BatchNorm2d(channels)
+        self.act = nn.LeakyReLU(inplace=True)
+        self.unshuffle = nn.PixelUnshuffle(downscale_factor=scale)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        out = self.conv(x)
+        out = self.bn(out)
+        out = self.act(out)
+        out = out + x
+        return self.unshuffle(out)
+
+
 class SVDNetworkTokenizer(nn.Module):
     def __init__(
             self,
@@ -23,15 +45,8 @@ class SVDNetworkTokenizer(nn.Module):
         current_channels = self.in_channels
         for scale in self.pixel_unshuffle_scale_factors:
             self.u_feature_extractor.append(
-                nn.Conv2d(
-                    in_channels=current_channels,
-                    out_channels=current_channels,
-                    kernel_size=3, padding=1, stride=1
-                ),
+                ResidualPixelUnshuffleBlock(current_channels, scale)
             )
-            self.u_feature_extractor.append(nn.BatchNorm2d(current_channels))
-            self.u_feature_extractor.append(nn.LeakyReLU())
-            self.u_feature_extractor.append(nn.PixelUnshuffle(downscale_factor=scale))
             current_channels = current_channels * (scale ** 2)
         self.u_feature_extractor = nn.Sequential(*self.u_feature_extractor)
 
@@ -46,15 +61,8 @@ class SVDNetworkTokenizer(nn.Module):
         current_channels = self.in_channels
         for scale in self.pixel_unshuffle_scale_factors:
             self.v_feature_extractor.append(
-                nn.Conv2d(
-                    in_channels=current_channels,
-                    out_channels=current_channels,
-                    kernel_size=3, padding=1, stride=1
-                )
+                ResidualPixelUnshuffleBlock(current_channels, scale)
             )
-            self.v_feature_extractor.append(nn.BatchNorm2d(current_channels))
-            self.v_feature_extractor.append(nn.LeakyReLU())
-            self.v_feature_extractor.append(nn.PixelUnshuffle(downscale_factor=scale))
             current_channels = current_channels * (scale ** 2)
         self.v_feature_extractor = nn.Sequential(*self.v_feature_extractor)
 
@@ -81,7 +89,6 @@ class SVDNetworkTokenizer(nn.Module):
         raw_u = self.u_feature_extractor(x)
         raw_v = self.v_feature_extractor(x)
 
-        # TODO: add residual connections
         projected_u = self.projection_u(raw_u)
         projected_v = self.projection_v(raw_v)
 

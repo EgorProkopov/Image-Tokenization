@@ -178,6 +178,7 @@ class ViTLightingModule(CustomClassificationLightningModule):
         log_step=1000,
         max_epochs=1,
         warmup_steps=0,
+        lr_gamma=0.80,
     ):
         model = VisionTransformer(
             image_size=tokenizer_hparams["image_size"],
@@ -190,6 +191,7 @@ class ViTLightingModule(CustomClassificationLightningModule):
             n_heads=model_hparams["n_heads"],
             n_classes=model_hparams["n_classes"]
         )
+        model = torch.compile(model=model)
         super().__init__(
             model,
             criterion,
@@ -198,5 +200,6 @@ class ViTLightingModule(CustomClassificationLightningModule):
             log_step=log_step,
             max_epochs=max_epochs,
             warmup_steps=warmup_steps,
+            lr_gamma=lr_gamma,
         )
         self.save_hyperparameters()

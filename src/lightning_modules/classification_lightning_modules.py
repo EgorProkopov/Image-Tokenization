@@ -4,7 +4,17 @@ from torchmetrics import Accuracy, Precision, Recall, F1Score
 
 
 class CustomClassificationLightningModule(pl.LightningModule):
-    def __init__(self, model, criterion, lr, n_classes, log_step=1000, max_epochs=1, warmup_steps=0):
+    def __init__(
+        self,
+        model,
+        criterion,
+        lr,
+        n_classes,
+        log_step=1000,
+        max_epochs=1,
+        warmup_steps=0,
+        lr_gamma=0.80,
+    ):
         """
         Base class for custom classification lightning models
 
@@ -15,6 +25,7 @@ class CustomClassificationLightningModule(pl.LightningModule):
          - n_classes: num_classes
          - max_epochs: total epochs for exponential decay schedule
          - warmup_steps: number of warmup steps before decay
+         - lr_gamma: exponential decay factor
         """
         super().__init__()
         self.model = model
@@ -23,6 +34,7 @@ class CustomClassificationLightningModule(pl.LightningModule):
         self.log_step = log_step
         self.max_epochs = max_epochs
         self.warmup_steps = warmup_steps
+        self.lr_gamma = lr_gamma
 
         self.train_accuracy = Accuracy(num_classes=n_classes, task="multiclass")
         self.train_precision = Precision(num_classes=n_classes, average='macro', task="multiclass")
@@ -135,7 +147,7 @@ class CustomClassificationLightningModule(pl.LightningModule):
 
         exp_decay = torch.optim.lr_scheduler.ExponentialLR(
             optimizer,
-            gamma=0.80
+            gamma=self.lr_gamma
         )
         schedulers.append({
             "scheduler": exp_decay,

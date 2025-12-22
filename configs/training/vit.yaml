@@ -1,8 +1,8 @@
 seed: 239
 
 training:
-  train_batch_size: 48
-  val_batch_size: 48
+  train_batch_size: 64
+  val_batch_size: 64
   num_workers: 12
   
   accelerator: "gpu"
@@ -11,7 +11,8 @@ training:
 
   max_epochs: 10
   lr: 5e-5
-  warmup_steps: 1000
+  warmup_steps: 2000
+  lr_gamma: 0.90
 
 logging:
   log_every_n_steps: 100
@@ -22,4 +23,4 @@ logging:
 
 clearml:
   project_name: "tokenizers"
-  task_name: "vit_tokenizer"
+  task_name: "vit_tokenizer_imagenet_full"

@@ -18,7 +18,7 @@ def prepare_dataloaders(
     train_batch_size: int = 64,
     val_batch_size: int = 64,
     num_workers: int = 4,
-    dataset_name: str = "clane9/imagenet-100",
+    dataset_name: str = "benjamin-paine/imagenet-1k",
 ) -> Tuple[DataLoader, DataLoader]:
     """
     Build train/val dataloaders from the HuggingFace dataset.
@@ -119,6 +119,7 @@ def train_vit(
     lr = training_config['training']['lr']
     max_epochs = training_config['training']['max_epochs']
     warmup_steps = training_config['training'].get('warmup_steps', 0)
+    lr_gamma = training_config['training'].get('lr_gamma', 0.80)
 
     model = ViTLightingModule(
         model_hparams=model_hparams,
@@ -128,6 +129,7 @@ def train_vit(
         log_step=training_config['logging']['log_every_n_steps'],
         max_epochs=max_epochs,
         warmup_steps=warmup_steps,
+        lr_gamma=lr_gamma,
     )
 
     train_dataloader, val_dataloader = prepare_dataloaders(
