@@ -27,12 +27,23 @@ class ResidualPixelUnshuffleBlock(nn.Module):
         return self.unshuffle(out)
 
 
-class SVDNetworkTokenizer(nn.Module):
+class SVDNetworkTorch(nn.Module):
+    """
+    Two-branch SVD-inspired tokenizer that extracts U and V features with
+    stacked pixel-unshuffle blocks, projects them to a shared embedding space,
+    and appends classification and positional tokens.
+
+    Args:
+        in_channels: Number of input image channels.
+        pixel_unshuffle_scale_factors: Per-stage downscale factors for the
+            pixel-unshuffle blocks in each branch.
+        embedding_dim: Dimension of the output token embeddings.
+    """
     def __init__(
             self,
-            in_channels: int =3,
-            pixel_unshuffle_scale_factors: list =[2,2,2,2],
-            embedding_dim: int =768
+            in_channels: int = 3,
+            pixel_unshuffle_scale_factors: list = [2, 2, 2, 2],
+            embedding_dim: int = 768
     ):
         super().__init__()
 
@@ -129,7 +140,24 @@ class SVDNetworkTokenizer(nn.Module):
         return tokens
     
 
-class SVDTEFTokenizer(SVDNetworkTokenizer):
+class SVDTEFTorch(SVDNetworkTorch):
+    """
+    SVD tokenizer with a learnable Token Estimation Function (TEF) for
+    token gating and optional filtering at inference.
+
+    Realized with full torch backend 
+
+    Args:
+        in_channels: Number of input image channels.
+        pixel_unshuffle_scale_factors: Per-stage downscale factors for the
+            pixel-unshuffle blocks in each branch.
+        embedding_dim: Dimension of the output token embeddings.
+        selection_mode: Token selection strategy at inference; one of
+            {"full", "top-k", "dispersion"}.
+        top_k: Number of tokens to keep when selection_mode="top-k".
+        dispersion_threshold: Cumulative gate mass to keep when
+            selection_mode="dispersion".
+    """
     def __init__(
         self,
         in_channels: int = 3,

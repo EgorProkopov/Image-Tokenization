@@ -21,7 +21,7 @@ def filter_and_pad_kernel(
     pe = tl.program_id(2)
 
     # mask [b, s]
-    mask = tl.load(MASK_ptr + b * S + s).to(tl.int1)
+    mask = tl.load(MASK_ptr + b * S + s).to(tl.int1)         # mask [b, s]
     
     dst = tl.load(IDX_ptr + b * S + s).to(tl.int32)
     dst = tl.where(mask, dst, 0)
@@ -33,7 +33,7 @@ def filter_and_pad_kernel(
     x_base = (b * S + s) * E
     x = tl.load(X_ptr + x_base + e, mask=e_mask, other=0.0)
 
-    y_base = (b * M + dst) * E  # move to the unfiltered token and save it to y
+    y_base = (b * M + dst) * E  # moves to the unfiltered token
 
     tl.store(Y_ptr + y_base + e, x, mask=e_mask & mask)
 
@@ -46,7 +46,7 @@ def filter_and_pad(
     num_warps: int = 4
 ):
     """
-    Equals to python-torch code:
+    Equals to this python-torch code:
         filtered_list = [seq_pe[b][mask_with_cls[b]] for b in range(B)]  # list of [M_b, E]
         padded_tokens = pad_sequence(filtered_list, batch_first=True)  # [B, M_max, E]
     """
@@ -54,8 +54,8 @@ def filter_and_pad(
     # TODO: add doctring for inputs and output
 
     assert x.is_cuda and mask.is_cuda, "x and mask should be on same devices"
-    assert x.is_contiguous() and mask.is_contiguous, "x and mask should be contiguous"
-    assert x.dim() == 3 and mask.dim == 2, "x dim should be equal 3 and mask dim should be equal 2"
+    assert x.is_contiguous() and mask.is_contiguous(), "x and mask should be contiguous"
+    assert x.dim() == 3 and mask.dim() == 2, "x dim should be equal 3 and mask dim should be equal 2"
     assert mask.dtype == torch.bool
     B, S, E = x.shape
     assert mask.shape == (B, S)
@@ -78,4 +78,4 @@ def filter_and_pad(
         num_warps=num_warps
     )
 
-    return out, lengths
+    return out
