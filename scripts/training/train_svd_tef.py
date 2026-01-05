@@ -35,7 +35,8 @@ def train_svd_tef_vit(
 
     training_hparams = {
         'auxiliary_criterion': training_config['training']['auxiliary_criterion'],
-        'auxiliary_alpha': training_config['training']['auxiliary_alpha']
+        'auxiliary_alpha': training_config['training']['auxiliary_alpha'],
+        'backend': training_config['training'].get('backend', 'torch')
     }
 
     cross_entropy_criterion = torch.nn.CrossEntropyLoss()

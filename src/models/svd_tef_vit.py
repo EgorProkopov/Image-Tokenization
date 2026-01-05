@@ -21,6 +21,7 @@ class SVDTEFViT(nn.Module):
         n_layers: int = 12,
         n_heads: int = 12,
         n_classes: int = 1000,
+        backend: str = "torch"
     ):
         super().__init__()
 
@@ -30,7 +31,8 @@ class SVDTEFViT(nn.Module):
             embedding_dim=embedding_dim,
             selection_mode=selection_mode,
             dispersion_threshold=dispersion_threshold,
-            top_k=top_k
+            top_k=top_k,
+            backend=backend
         )
 
         self.transformer_encoder = TransformerEncoder(
@@ -87,6 +89,7 @@ class SVDTEFViTLightningModule(CustomClassificationLightningModule):
             n_layers=model_hparams["n_layers"],
             n_heads=model_hparams["n_heads"],
             n_classes=model_hparams["n_classes"],
+            backend=training_hparams["backend"]
         )
         model = torch.compile(model=model)
         super().__init__(
