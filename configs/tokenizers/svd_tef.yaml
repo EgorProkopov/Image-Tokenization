@@ -1,0 +1,7 @@
+image_size: 256
+
+in_channels: 3
+pixel_unshuffle_scale_factors: [2, 2, 2, 2]
+selection_mode: "full"
+top_k: 25
+dispersion_threshold: 0.900

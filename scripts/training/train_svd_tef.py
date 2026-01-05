@@ -1,16 +1,15 @@
 import os
 import dotenv
 
-from typing import Tuple
 from omegaconf import DictConfig, OmegaConf
 
 import torch
 
 from scripts.training.train import train_classification, prepare_dataloaders
-from src.models.vit import ViTLightingModule
+from src.models.svd_tef_vit import SVDTEFViTLightningModule
 
 
-def train_vit(
+def train_svd_tef_vit(
     model_config: DictConfig,
     tokenizer_config: DictConfig,
     training_config: DictConfig
@@ -27,9 +26,16 @@ def train_vit(
     }
 
     tokenizer_hparams = {
-        'image_size': tokenizer_config['image_size'],
-        'patch_size': tokenizer_config['patch_size'],
-        'in_channels': tokenizer_config['in_channels']
+        'in_channels': tokenizer_config['in_channels'],
+        'pixel_unshuffle_scale_factors': tokenizer_config['pixel_unshuffle_scale_factors'],
+        'selection_mode': tokenizer_config['selection_mode'],
+        'top_k': tokenizer_config['top_k'],
+        'dispersion_threshold': tokenizer_config['dispersion_threshold']
+    }
+
+    training_hparams = {
+        'auxiliary_criterion': training_config['training']['auxiliary_criterion'],
+        'auxiliary_alpha': training_config['training']['auxiliary_alpha']
     }
 
     cross_entropy_criterion = torch.nn.CrossEntropyLoss()
@@ -39,9 +45,10 @@ def train_vit(
     warmup_steps = training_config['training'].get('warmup_steps', 0)
     lr_gamma = training_config['training'].get('lr_gamma', 0.80)
 
-    model = ViTLightingModule(
+    model = SVDTEFViTLightningModule(
         model_hparams=model_hparams,
         tokenizer_hparams=tokenizer_hparams,
+        training_hparams=training_hparams,
         criterion=cross_entropy_criterion,
         lr=lr,
         log_step=training_config['logging']['log_every_n_steps'],
@@ -54,7 +61,8 @@ def train_vit(
         image_size=tokenizer_config['image_size'],
         train_batch_size=training_config['training']['train_batch_size'],
         val_batch_size=training_config['training']['val_batch_size'],
-        num_workers=training_config['training']['num_workers']
+        num_workers=training_config['training']['num_workers'],
+        dataset_name="clane9/imagenet-100"
     )
 
     train_classification(
@@ -70,10 +78,10 @@ if __name__ == "__main__":
 
     CONFIGS_DIR = os.getenv("CONFIGS_DIR")
     model_config = OmegaConf.load(os.path.join(CONFIGS_DIR, "models", "vit_base.yaml"))
-    tokenizer_config = OmegaConf.load(os.path.join(CONFIGS_DIR, "tokenizers", "vit.yaml"))
-    training_config = OmegaConf.load(os.path.join(CONFIGS_DIR, "training", "vit.yaml"))
+    tokenizer_config = OmegaConf.load(os.path.join(CONFIGS_DIR, "tokenizers", "svd_tef.yaml"))
+    training_config = OmegaConf.load(os.path.join(CONFIGS_DIR, "training", "svd_tef_vit.yaml"))
 
-    train_vit(
+    train_svd_tef_vit(
         model_config=model_config,
         tokenizer_config=tokenizer_config,
         training_config=training_config

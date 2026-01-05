@@ -52,7 +52,7 @@ class SVDTEFTriton(SVDNetworkTorch):
         # Token Estimation Function (TEF) approximated by neural network
         self.mlp_scorer = nn.Sequential(
             nn.Linear(embedding_dim, 128),
-            nn.InstanceNorm1d(128),
+            nn.LayerNorm(128),
             nn.LeakyReLU(),
             nn.Linear(128, 1)
         )
