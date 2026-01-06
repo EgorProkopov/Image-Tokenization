@@ -126,9 +126,8 @@ class SVDNetworkTorch(nn.Module):
         """
         Adds sinusoidal positional encoding to projected tokens
         """
-        positional_encoding = self.positional_encoding(tokens)
-        tokens = tokens + positional_encoding
-        return tokens
+        positional_encoded_tokens = self.positional_encoding(tokens)
+        return positional_encoded_tokens
     
     def forward(self, x):
         raw_tokens = self._get_raw_tokens(x)

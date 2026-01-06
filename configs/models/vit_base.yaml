@@ -3,4 +3,4 @@ qkv_dim: 64
 mlp_hidden_size: 3072
 n_layers: 12
 n_heads: 12
-n_classes: 1000
+n_classes: 100

@@ -1,0 +1,6 @@
+image_size: 224
+patch_size: 16
+in_channels: 3
+
+filter_size: 96
+norm_type: "l-infinity"

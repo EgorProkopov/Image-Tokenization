@@ -9,16 +9,10 @@ training:
   devices: [0]
   strategy: "auto"
 
-  backend: "torch"   
-  # backend option supports only "torch" and "triton"
-
   max_epochs: 10
   lr: 5e-5
   warmup_steps: 2000
   lr_gamma: 0.90
-
-  auxiliary_criterion: "gated_l1_loss"
-  auxiliary_alpha: 1
 
 logging:
   log_every_n_steps: 100
@@ -29,4 +23,4 @@ logging:
 
 clearml:
   project_name: "tokenizers"
-  task_name: "svd_tef_tokenizer_imagenet_mini"
+  task_name: "fft_tokenizer_imagenet_micro"

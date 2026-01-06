@@ -22,12 +22,26 @@ from src.utils import set_seed
 def _init_clearml_task(
         project_name: str,
         task_name: str,
+        configs_to_log: Optional[dict] = None,
 ) -> Optional[Task]:
     task = Task.init(
         project_name=project_name,
         task_name=task_name,
     ) 
-    # TODO: логирование конфигов?
+    if task and configs_to_log:
+        for config_name, config in configs_to_log.items():
+            if config is None:
+                continue
+            config_to_log = (
+                OmegaConf.to_container(config, resolve=True)
+                if isinstance(config, DictConfig)
+                else config
+            )
+            task.connect_configuration(
+                name=config_name,
+                configuration=config_to_log,
+            )
+
     return task
 
 
@@ -116,6 +130,7 @@ def train_classification(
     val_dataloader: DataLoader,
 
     training_config: DictConfig,
+    clearml_configs: Optional[dict] = None,
 ):
     cleaml_project_name = training_config['clearml']['project_name']
     clearml_task_name = training_config['clearml']['task_name']
@@ -137,7 +152,8 @@ def train_classification(
 
     clearml_task = _init_clearml_task(
         project_name=cleaml_project_name,
-        task_name=clearml_task_name
+        task_name=clearml_task_name,
+        configs_to_log=clearml_configs,
     )
 
     tb_logger = TensorBoardLogger(
@@ -174,4 +190,3 @@ def train_classification(
     trainer.fit(model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
 
     return trainer
-

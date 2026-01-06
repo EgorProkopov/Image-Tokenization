@@ -74,7 +74,6 @@ class FFTViTLightingModule(CustomClassificationLightningModule):
             norm_type=tokenizer_hparams["norm_type"],
 
             embedding_dim=model_hparams["embedding_dim"],
-            num_bins=model_hparams["num_bins"],
             qkv_dim=model_hparams["qkv_dim"],
             mlp_hidden_size=model_hparams["mlp_hidden_size"],
             n_layers=model_hparams["n_layers"],

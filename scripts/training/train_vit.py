@@ -54,7 +54,8 @@ def train_vit(
         image_size=tokenizer_config['image_size'],
         train_batch_size=training_config['training']['train_batch_size'],
         val_batch_size=training_config['training']['val_batch_size'],
-        num_workers=training_config['training']['num_workers']
+        num_workers=training_config['training']['num_workers'],
+        dataset_name="benjamin-paine/imagenet-1k"
     )
 
     train_classification(

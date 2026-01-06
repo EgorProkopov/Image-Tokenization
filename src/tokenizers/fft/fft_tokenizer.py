@@ -65,8 +65,8 @@ class FFTTokenizer(nn.Module):
         cls_token = self.cls_token.expand(B, -1, -1)
         tokens = torch.cat([cls_token, tokens], dim=1)
 
-        tokens = tokens + self.positional_encoding(tokens)
-        return tokens
+        tokens_pe = self.positional_encoding(tokens)
+        return tokens_pe
 
     @staticmethod
     def compute_fft(image):
@@ -75,7 +75,7 @@ class FFTTokenizer(nn.Module):
         :return:
         """
         fft_image = torch.fft.fft2(image)
-        fft_image_shifted = torch.fft.fftshift(fft_image)
+        fft_image_shifted = torch.fft.fftshift(fft_image, dim=(-2, -1))
         return fft_image_shifted
 
     @staticmethod
@@ -112,7 +112,7 @@ class FFTTokenizer(nn.Module):
 
     @staticmethod
     def power_spectrum(fft_tensor):
-        power_spec = torch.abs(fft_tensor).float()
+        power_spec = torch.log1p(torch.abs(fft_tensor)).float()
         return power_spec
 
     @staticmethod
