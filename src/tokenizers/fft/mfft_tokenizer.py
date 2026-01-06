@@ -59,10 +59,10 @@ class FFTLowFreqFilter(nn.Module):
         fs = self.filter_size
         if fs == 0:
             power_spectrum = log_real.pow(2) + log_imag.pow(2)      # [B, 3, W, H]
-            energy = power_spectrum.sum(dim=1)              # [B, W, H]
+            energy = power_spectrum.sum(dim=1)                      # [B, W, H]
             fs = self.compute_filter_size(energy)
 
-        freq_cat = torch.cat([log_real, log_imag], dim=1)  # [B, 6, W, H]
+        freq_cat = torch.cat([log_real, log_imag], dim=1)           # [B, 6, W, H]
 
         B, C, W, H = freq_cat.shape
         half = fs // 2

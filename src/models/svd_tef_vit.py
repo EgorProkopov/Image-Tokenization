@@ -83,12 +83,14 @@ class SVDTEFViTLightningModule(CustomClassificationLightningModule):
             selection_mode=tokenizer_hparams["selection_mode"],
             top_k=tokenizer_hparams["top_k"],
             dispersion_threshold=tokenizer_hparams["dispersion_threshold"],
+
             embedding_dim=model_hparams["embedding_dim"],
             qkv_dim=model_hparams["qkv_dim"],
             mlp_hidden_size=model_hparams["mlp_hidden_size"],
             n_layers=model_hparams["n_layers"],
             n_heads=model_hparams["n_heads"],
             n_classes=model_hparams["n_classes"],
+            
             backend=training_hparams["backend"]
         )
         model = torch.compile(model=model)

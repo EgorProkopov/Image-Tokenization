@@ -184,6 +184,7 @@ class ViTLightingModule(CustomClassificationLightningModule):
             image_size=tokenizer_hparams["image_size"],
             patch_size=tokenizer_hparams["patch_size"],
             in_channels=tokenizer_hparams["in_channels"],
+            
             embedding_dim=model_hparams["embedding_dim"],
             qkv_dim=model_hparams["qkv_dim"],
             mlp_hidden_size=model_hparams["mlp_hidden_size"],
