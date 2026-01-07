@@ -24,6 +24,7 @@ class FFTLowFreqFilter(nn.Module):
         self.total_downscale = math.prod(self.downscale_factors)
         self.eps = eps
 
+
     def compute_filter_size(self, power: torch.Tensor) -> int:
         B, W, H = power.shape
         cumsum_h = torch.cumsum(power, dim=1)        # [B, W, H]
@@ -59,10 +60,10 @@ class FFTLowFreqFilter(nn.Module):
         fs = self.filter_size
         if fs == 0:
             power_spectrum = log_real.pow(2) + log_imag.pow(2)      # [B, 3, W, H]
-            energy = power_spectrum.sum(dim=1)                      # [B, W, H]
+            energy = power_spectrum.sum(dim=1)              # [B, W, H]
             fs = self.compute_filter_size(energy)
 
-        freq_cat = torch.cat([log_real, log_imag], dim=1)           # [B, 6, W, H]
+        freq_cat = torch.cat([log_real, log_imag], dim=1)  # [B, 6, W, H]
 
         B, C, W, H = freq_cat.shape
         half = fs // 2
@@ -117,7 +118,7 @@ class MFFTTokenizer(nn.Module):
         return torch.cat([cls, tokens], dim=1)
 
     def _add_positional_encoding(self, tokens: torch.Tensor) -> torch.Tensor:
-        return tokens + self.positional_encoding(tokens)
+        return self.positional_encoding(tokens)
 
     def forward(self, x: torch.Tensor) -> Dict[str, Any]:
         low = self.low_freq_filter(x)
@@ -134,4 +135,3 @@ class MFFTTokenizer(nn.Module):
         tokens = self._add_positional_encoding(tokens)
 
         return {"tokens": tokens, "filter_size": fs}
-

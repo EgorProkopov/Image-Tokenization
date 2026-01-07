@@ -11,9 +11,9 @@ class MFFTViT(nn.Module):
             self,
             in_channels: int = 3,
             pixel_unshuffle_scale_factors: list = [2, 2, 2, 2],
-            filter_size: int = 112,
-            energy_ratio: float = 0.900,
             embedding_dim: int = 768,
+            filter_size: int = 128,
+            energy_ratio: float = 0.900,
             qkv_dim: int = 64,
             mlp_hidden_size: int = 1024,
             n_layers: int = 12,
@@ -23,9 +23,9 @@ class MFFTViT(nn.Module):
         super().__init__()
 
         self.tokenizer = MFFTTokenizer(
-            in_channels=in_channels, 
+            in_channels=in_channels,
             pixel_unshuffle_scale_factors=pixel_unshuffle_scale_factors,
-            embedding_dim=embedding_dim, 
+            embedding_dim=embedding_dim,
             filter_size=filter_size,
             energy_ratio=energy_ratio
         )
@@ -69,17 +69,15 @@ class MFFTViTLightingModule(CustomClassificationLightningModule):
         model = MFFTViT(
             in_channels=tokenizer_hparams["in_channels"],
             pixel_unshuffle_scale_factors=tokenizer_hparams["pixel_unshuffle_scale_factors"],
+            embedding_dim=model_hparams["embedding_dim"],
             filter_size=tokenizer_hparams["filter_size"],
             energy_ratio=tokenizer_hparams["energy_ratio"],
-
-            embedding_dim=model_hparams["embedding_dim"],
             qkv_dim=model_hparams["qkv_dim"],
             mlp_hidden_size=model_hparams["mlp_hidden_size"],
             n_layers=model_hparams["n_layers"],
             n_heads=model_hparams["n_heads"],
-            n_classes=model_hparams["n_classes"]
+            n_classes=model_hparams["n_classes"],
         )
-        model = torch.compile(model=model)
         super().__init__(
             model,
             criterion,
@@ -93,16 +91,23 @@ class MFFTViTLightingModule(CustomClassificationLightningModule):
         self.save_hyperparameters()
 
     def forward(self, x):
-        return self.model(x)
+        mfft_output = self.model(x)
+        return mfft_output
 
     def training_step(self, batch, batch_idx):
+        # images = batch["image"]
+        # labels = batch["label_encoded"]
+
         images, labels = batch
 
         mfft_output = self.forward(images)
         logits = mfft_output["logits"]
+        filter_size = mfft_output["filter_size"]
 
         loss = self.criterion(logits, labels)
+
         self.log("train_loss", loss, prog_bar=True)
+        self.log("train_filter_size", filter_size, prog_bar=True)
 
         preds = torch.argmax(logits, dim=1)
         # labels = torch.argmax(labels, dim=1)
@@ -131,13 +136,19 @@ class MFFTViTLightingModule(CustomClassificationLightningModule):
         return loss
 
     def validation_step(self, batch, batch_idx):
+        # images = batch["image"]
+        # labels = batch["label_encoded"]
+
         images, labels = batch
 
         mfft_output = self.forward(images)
         logits = mfft_output["logits"]
+        filter_size = mfft_output["filter_size"]
 
         loss = self.criterion(logits, labels)
+
         preds = torch.argmax(logits, dim=1)
+        # labels = torch.argmax(labels, dim=1)
 
         self.val_accuracy.update(preds, labels)
         self.val_precision.update(preds, labels)
@@ -145,4 +156,5 @@ class MFFTViTLightingModule(CustomClassificationLightningModule):
         self.val_f1.update(preds, labels)
 
         self.log("val_loss", loss, prog_bar=False)
+        self.log("val_filter_size", filter_size, prog_bar=True)
         return loss

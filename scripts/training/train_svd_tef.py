@@ -63,7 +63,7 @@ def train_svd_tef_vit(
         train_batch_size=training_config['training']['train_batch_size'],
         val_batch_size=training_config['training']['val_batch_size'],
         num_workers=training_config['training']['num_workers'],
-        dataset_name="clane9/imagenet-100"
+        dataset_name="benjamin-paine/imagenet-1k"
     )
 
     train_classification(

@@ -2,5 +2,5 @@ image_size: 256
 
 in_channels: 3
 pixel_unshuffle_scale_factors: [2, 2, 2, 2]
-filter_size: 128
+filter_size: 0
 energy_ratio: 0.900
